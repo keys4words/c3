@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,6 +23,10 @@
             --equals-hover: #653a8a;
             --clear-bg: #ff6b6b;
             --clear-hover: #ee5a5a;
+            --journal-bg: rgba(255, 255, 255, 0.95);
+            --journal-border: rgba(0, 0, 0, 0.1);
+            --journal-text: #333;
+            --journal-item-hover: #f5f5f5;
         }
 
         [data-theme="dark"] {
@@ -43,6 +47,10 @@
             --equals-hover: #8855bb;
             --clear-bg: #ff6b6b;
             --clear-hover: #ff8888;
+            --journal-bg: rgba(42, 42, 42, 0.95);
+            --journal-border: rgba(255, 255, 255, 0.1);
+            --journal-text: #e0e0e0;
+            --journal-item-hover: #3a3a3a;
         }
 
         * {
@@ -60,6 +68,14 @@
             background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
             padding: 20px;
             transition: background 0.3s ease;
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            max-width: 1200px;
+            width: 100%;
         }
 
         .theme-toggle {
@@ -173,11 +189,141 @@
         .zero {
             grid-column: span 2;
         }
+
+        .journal {
+            background: var(--journal-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px var(--calculator-shadow);
+            padding: 30px;
+            width: 350px;
+            max-height: 600px;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .journal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--journal-border);
+        }
+
+        .journal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--journal-text);
+            margin: 0;
+        }
+
+        .journal-clear {
+            background: var(--clear-bg);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .journal-clear:hover {
+            background: var(--clear-hover);
+            transform: translateY(-1px);
+        }
+
+        .journal-list {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 10px;
+        }
+
+        .journal-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .journal-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .journal-list::-webkit-scrollbar-thumb {
+            background: var(--journal-border);
+            border-radius: 4px;
+        }
+
+        .journal-list::-webkit-scrollbar-thumb:hover {
+            background: var(--operator-bg);
+        }
+
+        .journal-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            background: var(--button-bg);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .journal-item:hover {
+            background: var(--journal-item-hover);
+            transform: translateX(5px);
+            border-color: var(--operator-bg);
+        }
+
+        .journal-expression {
+            font-size: 0.9rem;
+            color: var(--journal-text);
+            opacity: 0.8;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+
+        .journal-result {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--operator-bg);
+            word-break: break-all;
+        }
+
+        .journal-empty {
+            text-align: center;
+            color: var(--journal-text);
+            opacity: 0.5;
+            padding: 40px 20px;
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .journal {
+                width: 100%;
+                max-width: 400px;
+                max-height: 400px;
+            }
+
+            .theme-toggle {
+                top: 10px;
+                right: 10px;
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
-    <div class="calculator">
+    <div class="container">
+        <div class="calculator">
         <div class="display" id="display">0</div>
         <div class="buttons">
             <button class="clear" onclick="clearDisplay()">C</button>
@@ -203,6 +349,17 @@
             <button class="zero" onclick="appendNumber('0')">0</button>
             <button onclick="appendDecimal()">.</button>
         </div>
+    </div>
+    
+    <div class="journal">
+        <div class="journal-header">
+            <h2 class="journal-title">History</h2>
+            <button class="journal-clear" onclick="clearHistory()">Clear</button>
+        </div>
+        <div class="journal-list" id="journalList">
+            <div class="journal-empty">No calculations yet</div>
+        </div>
+    </div>
     </div>
 
     <script>
@@ -248,10 +405,96 @@
         initTheme();
         themeToggle.addEventListener('click', toggleTheme);
 
+        // Initialize history on page load
+        loadHistory();
+
         // Calculator functionality
         let display = document.getElementById('display');
         let currentInput = '0';
         let shouldResetDisplay = false;
+        let operationHistory = [];
+
+        // Initialize history from localStorage
+        function loadHistory() {
+            const savedHistory = localStorage.getItem('calculatorHistory');
+            if (savedHistory) {
+                operationHistory = JSON.parse(savedHistory);
+                renderHistory();
+            }
+        }
+
+        // Save history to localStorage
+        function saveHistory() {
+            localStorage.setItem('calculatorHistory', JSON.stringify(operationHistory));
+        }
+
+        // Add operation to history
+        function addToHistory(expression, result) {
+            const operation = {
+                expression: expression,
+                result: result,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            operationHistory.unshift(operation);
+            
+            // Limit history to 50 items
+            if (operationHistory.length > 50) {
+                operationHistory = operationHistory.slice(0, 50);
+            }
+            
+            saveHistory();
+            renderHistory();
+        }
+
+        // Render history list
+        function renderHistory() {
+            const journalList = document.getElementById('journalList');
+            journalList.innerHTML = '';
+            
+            if (operationHistory.length === 0) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'journal-empty';
+                emptyDiv.textContent = 'No calculations yet';
+                journalList.appendChild(emptyDiv);
+                return;
+            }
+            
+            operationHistory.forEach((op, index) => {
+                const item = document.createElement('div');
+                item.className = 'journal-item';
+                
+                // Format expression for display (replace * with ×)
+                const displayExpression = op.expression.replace(/\*/g, '×');
+                
+                const expressionDiv = document.createElement('div');
+                expressionDiv.className = 'journal-expression';
+                expressionDiv.textContent = displayExpression;
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'journal-result';
+                resultDiv.textContent = '= ' + op.result;
+                
+                item.appendChild(expressionDiv);
+                item.appendChild(resultDiv);
+                item.onclick = () => useFromHistory(op.result, index);
+                
+                journalList.appendChild(item);
+            });
+        }
+
+        // Use result from history
+        function useFromHistory(result, index) {
+            currentInput = result;
+            shouldResetDisplay = true;
+            updateDisplay();
+        }
+
+        // Clear history
+        function clearHistory() {
+            operationHistory = [];
+            saveHistory();
+            renderHistory();
+        }
 
         function updateDisplay() {
             display.textContent = currentInput;
@@ -299,12 +542,13 @@
 
         function calculate() {
             try {
+                const originalExpression = currentInput;
                 // Заменяем × на * для вычисления
                 let expression = currentInput.replace(/×/g, '*');
                 
                 // Проверяем на деление на ноль
                 if (expression.includes('/0') && !expression.includes('/0.')) {
-                    currentInput = 'Ошибка';
+                    currentInput = 'Error';
                     updateDisplay();
                     shouldResetDisplay = true;
                     return;
@@ -313,15 +557,20 @@
                 const result = Function('"use strict"; return (' + expression + ')')();
                 
                 if (isNaN(result) || !isFinite(result)) {
-                    currentInput = 'Ошибка';
+                    currentInput = 'Error';
+                    updateDisplay();
+                    shouldResetDisplay = true;
                 } else {
-                    currentInput = result.toString();
+                    const resultString = result.toString();
+                    currentInput = resultString;
+                    updateDisplay();
+                    shouldResetDisplay = true;
+                    
+                    // Add to history only if calculation was successful
+                    addToHistory(originalExpression, resultString);
                 }
-                
-                updateDisplay();
-                shouldResetDisplay = true;
             } catch (error) {
-                currentInput = 'Ошибка';
+                currentInput = 'Error';
                 updateDisplay();
                 shouldResetDisplay = true;
             }
